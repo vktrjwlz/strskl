@@ -1,41 +1,45 @@
-var mwstr = {}; // init lzr namespace
+var mwhp = {}; // init lzr namespace
 
-mwstr.errng = function () {
+mwhp.errng = function () {
   var errng = this;
-  errng.mn = vec2.fromValues(50, 50); // min screen coord of bounds
-  errng.sz = vec2.fromValues(1400, 400); // screen size of bounds
-  errng.mmsz = vec2.fromValues(70, 20); // millimeter size of bounds
+  errng.mn = vec2.fromValues(2, 2); // min screen coord of bounds
+  errng.sz = vec2.fromValues(70, 70);
+  errng.mmsz = vec2.fromValues(70, 70); // millimeter size of bounds
 
-  errng.wide_thrsh = Math.PI / 1.5;
+  errng.orgn = vec2.fromValues(39, 35); // screen size of bounds
+  errng.rad = 30.0;
+
+  // errng.wide_thrsh = Math.PI / 1.5;
 
   errng.mxattmpts = 1000; // num times to attempt to generate vertices
-  errng.cll = 0.6; // ratio of generated vertices to cull
-  errng.mndst = 100; // min distance between vertices
-  errng.strt = 12; // width of struts
+  errng.cll = 0.4; // ratio of generated vertices to cull
+  errng.hp_cll = 0.2;
+  errng.mndst = 5; // min distance between vertices
+  errng.strt = 0.6; // width of struts
   errng.mn_split_brdth = errng.strt * 3.0; // min breadth to split triangle
 
-  errng.hkdst = 160.0; // top keepout (for hook) (on left)
-  errng.hkvrts = [vec2.fromValues(150, 300), vec2.fromValues(150, 200)];
+  errng.hkvrts = [vec2.fromValues(8, 38), vec2.fromValues(8, 32)];
   errng.hkx = [
-    vec2.fromValues(80, 220),
-    vec2.fromValues(60, 250),
-    vec2.fromValues(80, 280)];
+    vec2.fromValues(6, 33),
+    vec2.fromValues(5, 35),
+    vec2.fromValues(6, 37)];
   errng.hkvd = [ // will be offset by strut width
-    vec2.fromValues(150, 200),
-    vec2.fromValues(80, 220),
-    vec2.fromValues(60, 250),
-    vec2.fromValues(80, 280),
-    vec2.fromValues(150, 300)];
+    vec2.fromValues(8, 34),
+    vec2.fromValues(6.5, 33.5),
+    vec2.fromValues(5, 35),
+    vec2.fromValues(6.5, 36.5),
+    vec2.fromValues(8, 36)];
 
+  errng.hp = null;
   errng.dlny = null;
   errng.pn = null;
 }
 
-mwstr.errng.prototype = {
+mwhp.errng.prototype = {
 
-  constructor: mwstr.errng,
+  constructor: mwhp.errng,
 
-  // generate a new mwstr earring
+  // generate a new mwhp earring
   generate: function() {
     var errng = this;
 
@@ -44,36 +48,80 @@ mwstr.errng.prototype = {
     // generate random vertices for delaunay
     // create delaunay triangulation
     errng.dlny = new lzr.dlny();
-    var i = 0;
+
+    var rtmt = mat2.create();
+    var orgn = vec2.create();
+    vec2.add(orgn, errng.mn, errng.orgn); // get center of hoop
+
+    console.log("hoop origin " + orgn);
+
+    // add hook vertices (where hook will be anchored)
+    var hkdxs = [];
+    for (var i = 0; i < errng.hkvrts.length; i++) {
+      hkdxs.push(errng.dlny.vrts.length);
+      var vrt = vec2.clone(errng.hkvrts[i]);
+      vec2.add(vrt, vrt, errng.mn); // add mn to hook vertices
+      errng.dlny.vrts.push(vrt);
+    }
+
+    // generate points on hoop
     var attmpts = 0;
+    var i = 0;
     while (attmpts < errng.mxattmpts) {
       attmpts++;
-      var vrt = vec2.fromValues(
-         (Math.random() * (errng.sz[0] - errng.hkdst)) + errng.mn[0] + errng.hkdst,
-         (Math.random() * errng.sz[1]) + errng.mn[1]);
+
+      // create vertex on hoop & rotate by random angle
+      var vrt = vec2.fromValues(errng.rad, 0); // create vertex at angle 0
+      var angl = Math.random() * Math.PI * 2.0;
+      mat2.fromRotation(rtmt, angl);
+      vec2.transformMat2(vrt, vrt, rtmt);
+
+      // add to hoop origin
+      vec2.add(vrt, vrt, orgn);
+
+      // if space is free add to hoop vertices
       var clst = errng.dlny.get_closest(vrt);
       if (clst === null || vec2.dist(vrt, clst) > errng.mndst) {
         errng.dlny.vrts.push(vrt);
         i++;
       }
     }
-    while (errng.dlny.vrts.length > i * errng.cll) errng.dlny.vrts.pop();
-    console.log("generated " + i + " vertices in " + attmpts + " attempts");
-    console.log("culled to " + errng.dlny.vrts.length + " vertices");
+    console.log("generated " + i + " hoop vertices in " + attmpts + " attempts");
+    for (var j = 0; j < i * errng.hp_cll; j++) errng.dlny.vrts.pop();
+    console.log("culled " + j + " hoop vertices");
 
-    // add hook vertex
-    var hkdxs = [];
-    for (var i = 0; i < errng.hkvrts.length; i++) {
-      hkdxs.push(errng.dlny.vrts.length);
-      errng.dlny.vrts.push(vec2.clone(errng.hkvrts[i]));
+    // generate points inside hoop
+    attmpts = 0;
+    i = 0;
+    while (attmpts < errng.mxattmpts) {
+      attmpts++;
+      var vrt = vec2.fromValues((Math.random() * errng.rad) + errng.mn[0], 0);
+      var angl = Math.random() * Math.PI * 2.0;
+      mat2.fromRotation(rtmt, angl);
+      vec2.transformMat2(vrt, vrt, rtmt);
+
+      // add to hoop origin
+      vec2.add(vrt, vrt, orgn);
+
+      // console.log("generated possible interior point at " + vrt);
+
+      // if space is free add to hoop vertices
+      var clst = errng.dlny.get_closest(vrt);
+      if (clst === null || vec2.dist(vrt, clst) > errng.mndst) {
+        errng.dlny.vrts.push(vrt);
+        i++;
+      }
     }
+    console.log("generated " + i + " interior vertices in " + attmpts + " attempts");
+    for (var j = 0; j < i * errng.cll; j++) errng.dlny.vrts.pop();
+    console.log("culled " + j + " interior vertices");
 
     // triangulate
     errng.dlny.triangulate();
 
     // prune edge triangles
-    errng.prune_edge_trngls(errng.wide_thrsh);
-    errng.prune_edge_trngls(errng.wide_thrsh);
+    // errng.prune_edge_trngls(errng.wide_thrsh);
+    // errng.prune_edge_trngls(errng.wide_thrsh);
 
     // generate boundary loop from triangle edges without adjacent triangles
     var edges = {}; // map from first vertex index to second vertex index
@@ -95,6 +143,7 @@ mwstr.errng.prototype = {
 
     // loop over edges (starting with first hook vrt dx) to generate boundary
     var fvdx = hkdxs[0];
+    // var fvdx = 0; // first vertex is in hoop
     var nvdx = fvdx;
     errng.pn.bndry.vrts.push(vec2.clone(errng.dlny.vrts[nvdx]));
 
@@ -113,7 +162,9 @@ mwstr.errng.prototype = {
 
     // add hook extension vertices
     for (var i = 0; i < errng.hkx.length; i++) {
-      errng.pn.bndry.vrts.push(vec2.clone(errng.hkx[i]));
+      var vrt = vec2.clone(errng.hkx[i]);
+      vec2.add(vrt, vrt, errng.mn);
+      errng.pn.bndry.vrts.push(vrt);
     }
 
     // offset boundary loop
@@ -122,10 +173,15 @@ mwstr.errng.prototype = {
     // add hook void
     var hkvd = new lzr.lp();
     for (var i = 0; i < errng.hkvd.length; i++) {
-      hkvd.vrts.push(vec2.clone(errng.hkvd[i]));
+      var vrt = vec2.clone(errng.hkvd[i]);
+      vec2.add(vrt, vrt, errng.mn);
+      hkvd.vrts.push(vrt);
     }
+    // console.log("hook void before offset " + hkvd.vrts.join(" | "));
     hkvd.offset(errng.strt * -0.5);
     errng.pn.vds.push(hkvd);
+
+    console.log("added hook void " + hkvd.vrts.join(" | "));
 
     console.log("adding earring voids");
 

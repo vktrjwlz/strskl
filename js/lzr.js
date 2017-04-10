@@ -648,6 +648,24 @@ lzr.v2.lst_mn = function (lst) {
   }
   return mnv;
 }
+// find closest vertex to given vertex
+lzr.v2.lst_closest = function (lst, vrt) {
+
+  // check that there are more than omega vertices
+  if (lst.length < 1) return null;
+
+  var mn_vrt = lst[0];
+  var mn_dlta = vec2.dist(vrt, mn_vrt);
+  for (var i = 1; i < lst.length; i++) {
+    var nxt_vrt = lst[i];
+    var nxt_dlta = vec2.dist(vrt, nxt_vrt);
+    if (nxt_dlta < mn_dlta) {
+      mn_vrt = nxt_vrt;
+      mn_dlta = nxt_dlta;
+    }
+  }
+  return mn_vrt;
+}
 lzr.v2.lst_contains = function (lst, v) {
   for (var i = 0; i < lst.length; i++) {
     if (lzr.v2.cmp(lst[i], v) === 0) return true;

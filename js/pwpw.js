@@ -1,30 +1,22 @@
 var rndrr;
-var msh = null;
-var rng = null;
-var mnOff = 0.0;
-var mxOff = 128.0;
-var offset = 0.0;
+
 var pointerDown = false;
 var anchorP = vec2.fromValues(128.0, 128.0);
 var lastP = vec2.create();
-var mn = vec2.fromValues(50.0, 50.0);
-var sz = vec2.fromValues(1200.0, 400.0);
-var mndst = 80.0;
 
 var dlny = null;
-
 
 function pwpw() {
   var cnvs = document.getElementById("lzrcnvs");
   rndrr = new lzr.rndrr(cnvs);
 
-  rndrr.zoom = vec2.fromValues(1.0, 1.0);
+  rndrr.zoom = vec2.fromValues(12.0, 12.0);
   rndrr.setResolution();
 
   console.log("creating earring");
 
   // create earring
-  errng = new mwstr.errng();
+  errng = new mwhp.errng();
 
   errng.generate();
   errng.pn.rgba = [0.7, 0.0, 0.0, 0.7]; // reddish
