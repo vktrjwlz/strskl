@@ -13,7 +13,7 @@ mwhp.errng = function () {
 
   errng.mxattmpts = 1000; // num times to attempt to generate vertices
   errng.cll = 0.4; // ratio of generated vertices to cull
-  errng.hp_cll = 0.2;
+  errng.hp_cll = 0.1;
   errng.mndst = 5; // min distance between vertices
   errng.strt = 0.6; // width of struts
   errng.mn_split_brdth = errng.strt * 3.0; // min breadth to split triangle
