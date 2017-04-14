@@ -386,9 +386,9 @@ lzr.sg.set_end = function (out, p) {
   return out;
 }
 
-lzr.sg.stringize = function (sg) {
-  return "sg( (" + sg[0] + ", " + sg[1] + "), ("
-                  + sg[2] + ", " + sg[3] + ") )";
+lzr.sg.str = function (sg) {
+  return "sg( (" + sg[0].toFixed(2) + " " + sg[1].toFixed(2) + ") ("
+                  + sg[2].toFixed(2) + " " + sg[3].toFixed(2) + ") )";
 }
 
 lzr.sg.mag = function (sg) {
@@ -430,6 +430,15 @@ lzr.sg.is_left = function (sg, p) { // vec2 p
   var b = vec2.create();
   lzr.sg.end( b, sg );
   return (((b[0]-a[0])*(p[1]-a[1])) - ((b[1]-a[1])*(p[0]-a[0]))) < 0;
+}
+
+lzr.sg.rotate = function (sg, angl) {
+  var rtmt = mat2.create();
+  mat2.fromRotation(rtmt, angl);
+  var dlta = vec2.create();
+  lzr.sg.dlta(dlta, sg);
+  vec2.transformMat2(dlta, dlta, rtmt);
+  lzr.sg.set_dlta(sg, dlta);
 }
 
 // return code for indicating region is touching, left or right of segment
@@ -489,7 +498,7 @@ lzr.sg.intersect_orgn = function (out, sga, sgb) {
   return true;
 }
 
-// set origin and delta of out sg to intersections of sga & om and sg & on
+// set origin and delta of out sg to intersections of sga & sgb and sg & sgc
 lzr.sg.intersect_intrvl = function (out, sga, sgb, sgc) { // lzr.sg
   var p = vec2.create();
   lzr.sg.intersect(p, sga, sgb);
@@ -616,6 +625,10 @@ lzr.sg.ortho_nrml = function (nrml, sg) { // calc normal orthogonal to segment
 // vect2 util funcs
 lzr.EPSILON = 0.001
 lzr.v2 = {}
+lzr.v2.str = function (v) {
+  if (v === null) return "()";
+  return "(" + v[0].toFixed(2) + " " + v[1].toFixed(2) + ")";
+}
 lzr.v2.qrot = function (ouv, v) { // quarter rotation clockwise
   vec2.set(ouv, v[1], -v[0]);
 }
@@ -701,6 +714,11 @@ lzr.ln.prototype = {
 
   constructor: lzr.ln,
   render: lzr.msh.prototype.render,
+
+  toString: function () {
+    var ln = this;
+    return "ln( " + ln.vertices.join(" - ") + " )";
+  },
 
   buff: function (gl) {
     var ln = this;
@@ -1001,7 +1019,7 @@ lzr.pn._splice_void = function (vs, lp) {
   var mnbv = lzr.v2.lst_mn(vs);
   var isg = lzr.sg.from_end(vv, vec2.fromValues(mnbv[0], vv[1]));
 
-  console.log("isg " + lzr.sg.stringize(isg));
+  console.log("isg " + lzr.sg.str(isg));
 
   // check if segment intersects any boundary vertices
   for (var i = 0; i < vs.length; i++) {

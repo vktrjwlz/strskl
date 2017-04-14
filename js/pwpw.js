@@ -4,24 +4,47 @@ var pointerDown = false;
 var anchorP = vec2.fromValues(128.0, 128.0);
 var lastP = vec2.create();
 
-var dlny = null;
+var errng = null;
 
 function pwpw() {
   var cnvs = document.getElementById("lzrcnvs");
   rndrr = new lzr.rndrr(cnvs);
 
-  rndrr.zoom = vec2.fromValues(12.0, 12.0);
+  rndrr.zoom = vec2.fromValues(20.0, 20.0);
   rndrr.setResolution();
 
   console.log("creating earring");
 
   // create earring
-  errng = new mwhp.errng();
+  errng = new strskl.errng();
 
   errng.generate();
-  errng.pn.rgba = [0.7, 0.0, 0.0, 0.7]; // reddish
 
-  rndrr.mshs.push(errng.pn);
+  for (var i = 0; i < errng.lns.length; i++)
+    rndrr.mshs.push(errng.lns[i]);
+
+  for (var i = 0; i < errng.skls.length; i++) {
+    var vrt = vec2.clone(errng.skls[i].tp);
+    vec2.add(vrt, vrt, errng.mn);
+    vec2.add(vrt, vrt, errng.orgn);
+    var r = new lzr.rng();
+    r.rgba = [0.0, 1.0, 0.0, 0.5]; // greenish
+    r.center = vrt;
+    r.radius = 1.0;
+    r.weight = 0.2;
+    r.segments = 16;
+    rndrr.mshs.push(r);
+  }
+
+  var c = new lzr.rng();
+  var vrt = vec2.clone(errng.orgn);
+  vec2.add(vrt, vrt, errng.mn);
+  c.rgba = [0.0, 0.0, 1.0, 0.5]; // blueish
+  c.center = vrt;
+  c.radius = errng.cntr_rad;
+  c.weight = 0.4;
+  c.segments = 32;
+  rndrr.mshs.push(c);
 
   console.log("buffing earring");
 
