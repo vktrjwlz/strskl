@@ -12,12 +12,12 @@ strskl.errng = function () {
 
   // errng.wide_thrsh = Math.PI / 1.5;
 
-  errng.mxattmpts = 100; // num times to attempt to generate vertices
+  errng.mxattmpts = 1000; // num times to attempt to generate vertices
   errng.mx_slc = 0.5;
 
   errng.strt = 0.6; // width of struts
 
-  errng.mndst = errng.strt * 2.5; // min distance between vertices
+  errng.mndst = 2; // min distance between vertices
 
   errng.skls = null;
   errng.pn = null;
@@ -49,7 +49,13 @@ strskl.errng.prototype = {
       var angl = Math.random() * Math.PI * 2.0;
       var skl = new strskl.skl(angl, rad);
 
-      errng._add_skl(skl); // try to add skl
+      // try to add skl if its min distance from others
+      var mndst = true;
+      for (var i = 0; i < errng.skls.length; i++) {
+        var dst = vec2.dist(skl.tp, errng.skls[i].tp);
+        if (dst < errng.mndst) mndst = false;
+      }
+      if (mndst) errng._add_skl(skl);
     }
     console.log("generated " + errng.skls.length + " skls in " + attmpts + " attempts");
 
@@ -85,8 +91,12 @@ strskl.errng.prototype = {
     var errng = this;
 
     // if skl is covered fail
-    for (var i = 0; i < errng.skls.length; i++)
-      if (errng.skls[i].covers(skl)) return false;
+    for (var i = 0; i < errng.skls.length; i++) {
+      if (errng.skls[i].covers(skl)) {
+        console.log("$$$ " + errng.skls[i].toString() + " covers " + skl.toString() + " :/");
+        return false;
+      }
+    }
 
     // find skl to intersect with
     var mnlftdst = skl.rad;
@@ -98,7 +108,10 @@ strskl.errng.prototype = {
     for (var i = 0; i < errng.skls.length; i++) {
       var oskl = errng.skls[i];
       var ivrt = vec2.create();
-      var iskt = oskl.intersects(skl, ivrt);
+      var ts = [];
+      var iskt = oskl.intersects(skl, ivrt, ts);
+
+      // if intersection test was successful check if it is closest
       if (iskt !== 0) {
         var dlta = vec2.create();
         vec2.sub(dlta, ivrt, skl.tp);
@@ -141,10 +154,11 @@ strskl.errng.prototype = {
     return true;
   },
 
+  // intersect skl ray with center min radius
   _intersect_cntr: function (skl, ivrt, lft) {
     var errng = this;
 
-    console.log("intersecting " + skl + " with cntr, left: " + lft);
+    // console.log("intersecting " + skl + " with cntr, left: " + lft);
 
     // generate left or right segment to intersect
     var o = vec2.fromValues(0, 0);
@@ -152,11 +166,11 @@ strskl.errng.prototype = {
     var angl = skl.swp * 0.5;
     if (lft) angl = angl * -1.0;
 
-    console.log("rotating tip sg " + lzr.sg.str(tsg) + " by angle " + angl);
+    // console.log("rotating tip sg " + lzr.sg.str(tsg) + " by angle " + angl);
 
     lzr.sg.rotate(tsg, angl);
 
-    console.log("sg to intersect: " + lzr.sg.str(tsg));
+    // console.log("sg to intersect: " + lzr.sg.str(tsg));
 
     // calculate intersection point
     // http://stackoverflow.com/questions/1073336/circle-line-segment-collision-detection-algorithm
@@ -165,24 +179,24 @@ strskl.errng.prototype = {
     lzr.sg.dlta(d, tsg);
     var f = vec2.clone(skl.tp);
 
-    console.log("d: " + d + " f: " + f);
+    // console.log("d: " + d + " f: " + f);
 
     var a = vec2.dot(d, d);
     var b = 2 * vec2.dot(f, d);
     var c = vec2.dot(f, f) - (r * r);
 
-    console.log("a: " + a + " b: " + b + " c: " + c);
+    // console.log("a: " + a + " b: " + b + " c: " + c);
 
     var dscr = (b * b) - (4 * a * c);
     if (dscr < 0) {
-      console.log("doesnt intersect circle, discriminant less than 0: " + dscr);
+      // console.log("doesnt intersect circle, discriminant less than 0: " + dscr);
       return false;
     }
 
     dscr = Math.sqrt(dscr);
     var t = (-b - dscr) / (2.0 * a);
 
-    console.log("t: " + t);
+    // console.log("t: " + t);
 
     vec2.scale(d, d, t);
     lzr.sg.set_dlta(tsg, d);
@@ -191,45 +205,19 @@ strskl.errng.prototype = {
     var iskt = vec2.create();
     lzr.sg.end(iskt, tsg);
 
-    console.log("*intersects at: " + iskt);
+    // console.log("*intersects at: " + iskt);
 
     // calculate slice of circle covered
     var osg = lzr.sg.from_end(o, skl.tp);
     var slc = lzr.sg.angle_to(osg, iskt);
 
-    console.log("slice covered: " + slc);
+    // console.log("slice covered: " + slc);
 
     if (slc > errng.mx_slc) return false;
 
-    console.log("***intersects circle within max slice!");
+    // console.log("***intersects circle within max slice!");
     vec2.copy(ivrt, iskt);
     return true;
-  },
-
-
-  prune_edge_trngls: function (mnangl) {
-    var errng = this;
-
-    var nwtrngls = [];
-    for (var i = 0; i < errng.dlny.trngls.length; i++) {
-      var trngl = errng.dlny.trngls[i];
-      var edges = [];
-      for (var j = 0; j < trngl.dxs.length; j++) {
-        if (errng.dlny.get_adjacent(trngl, trngl.dxs[j]) === null) {
-          edges.push(j);
-        }
-      }
-
-      // prune triangles with one outside edge & wider than threshold
-      if (edges.length === 1 && trngl.get_angle(edges[0]) > mnangl) {
-        //console.log("pruning triangle " + trngl);
-
-      } else {
-        nwtrngls.push(trngl);
-      }
-    }
-    console.log("pruned " + (errng.dlny.trngls.length - nwtrngls.length).toString() + " triangles");
-    errng.dlny.trngls = nwtrngls;
   },
 
   dl_dxf: function () {
@@ -255,7 +243,7 @@ strskl.errng.prototype = {
 strskl.skl = function (angl, rad) {
   var skl = this;
 
-  skl.mx_iskt = Math.PI / 2.5; // max intersect angle between tip rays
+  skl.mx_iskt = Math.PI / 2.0; // max intersect angle between tip rays
   skl.swp = 1.0; // angle swept between vertices at tip
 
   skl.angl = angl;
@@ -290,7 +278,7 @@ strskl.skl.prototype = {
   covers: function (oskl) {
     var skl = this;
 
-    // if other skales radius is larger doesnt cover
+    // if other skls radius is larger doesnt cover
     if (oskl.rad > skl.rad) return false;
 
     // if angle from tip to to other point is more than half angle doesnt cover
@@ -299,15 +287,19 @@ strskl.skl.prototype = {
     var angl = lzr.sg.angle_to(tpsg, oskl.tp);
     if (angl > skl.swp * 0.5) return false;
 
+    // if distance is greater than tip radius doesnt cover
+    var tpdst = vec2.dist(skl.tp, oskl.tp);
+    if (tpdst > skl.rad) return false;
+
     return true;
   },
 
   // return side intersected & intersection point
   // assumes oskl isnt covered by this skl
-  intersects: function (oskl, ivrt) { // 1 -> left, 0 -> not, -1 -> right
+  intersects: function (oskl, ivrt, ts) { // 1 -> left, 0 -> not, -1 -> right
     var skl = this;
 
-    // console.log("testing if " + oskl + " intersects " + skl);
+    console.log("testing if " + oskl + " intersects " + skl);
 
     if (skl.lft_vrt === null || skl.rt_vrt === null) {
       console.log("ERROR: attempted to intersect with unset skl");
@@ -318,32 +310,53 @@ strskl.skl.prototype = {
     var lft = lzr.sg.is_left(osg, oskl.tp);
     var angl = lzr.sg.angle_to(osg, oskl.tp);
 
-    // console.log("angle betweeen scales: " + angl + " left: " + lft);
+    console.log("angle betweeen scales: " + angl.toFixed(2) + " left: " + lft);
 
     // if angle between skls is less than epsilon return 0
     if (angl < lzr.EPSILON) return 0;
 
     // if angle of intersection is greater than max skls dont intersect
     if (angl + ((skl.swp + oskl.swp) * 0.5) > skl.mx_iskt) {
-      // console.log("cant intersect: angle between scales too large");
+      console.log("cant intersect: angle between scales too large");
       return 0;
     }
 
     // get sgs to intersect from other skl and this skl
     var otsg = lzr.sg.from_end(oskl.tp, vec2.fromValues(0, 0));
-    var tsg;
-    if (lft) {
+    var nd;
+    if (!lft) {
       lzr.sg.rotate(otsg, oskl.swp * 0.5);
-      tsg = lzr.sg.from_end(skl.tp, skl.lft_vrt);
+      nd = skl.lft_vrt;
     } else {
       lzr.sg.rotate(otsg, oskl.swp * -0.5);
-      tsg = lzr.sg.from_end(skl.tp, skl.rt_vrt);
+      nd = skl.rt_vrt;
     }
+    var tsg = lzr.sg.from_end(skl.tp, nd);
 
-    // console.log("***intersecting " + lzr.sg.str(tsg) + " and " + lzr.sg.str(otsg));
+    console.log("*intersecting " + lzr.sg.str(tsg) + " and " + lzr.sg.str(otsg));
 
     // find point where other sg intersects with this sg
     lzr.sg.intersect(ivrt, otsg, tsg);
+
+    console.log("***intersection point: " + lzr.v2.str(ivrt));
+
+    // find t of intersection point
+    var tplngth = vec2.dist(ivrt, skl.tp);
+    var ndlngth = vec2.dist(ivrt, nd);
+    var rylngth = lzr.sg.mag(tsg);
+    var t = tplngth / rylngth;
+
+    ts.push(t); // push t value of intersection point
+
+    console.log("tplngth: " + tplngth.toFixed(2)
+      + " ndlngth: " + ndlngth.toFixed(2)
+      + " rylngth: " + rylngth.toFixed(2));
+    console.log("******intersects at t: " + t.toFixed(2));
+
+    if (tplngth > rylngth || ndlngth > rylngth) {
+      console.log("******intersection is outside of segment");
+      return 0;
+    }
 
     // return 1 for left or -1 for right
     if (lft) return 1;
