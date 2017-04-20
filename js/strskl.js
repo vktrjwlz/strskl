@@ -17,7 +17,9 @@ strskl.errng = function () {
 
   errng.strt = 0.6; // width of struts
 
-  errng.mndst = 2; // min distance between vertices
+  errng.mndst = 2.0; // min distance between vertices
+
+  errng.mn_ry = 2.0;
 
   errng.skls = null;
   errng.pn = null;
@@ -150,6 +152,15 @@ strskl.errng.prototype = {
       skl.rt_vrt = mnrtvrt;
       skl.rt_rnt = mnrtdx;
     }
+
+    // find length of new rays
+    var lftlngth = vec2.dist(skl.tp, skl.lft_vrt);
+    var rtlngth = vec2.dist(skl.tp, skl.rt_vrt);
+    if (lftlngth < errng.mn_ry || rtlngth < errng.mn_ry) {
+      console.log("cant add new skl: ray too short");
+      return false;
+    }
+
     errng.skls.push(skl);
     return true;
   },
@@ -244,6 +255,7 @@ strskl.skl = function (angl, rad) {
   var skl = this;
 
   skl.mx_iskt = Math.PI / 2.0; // max intersect angle between tip rays
+  skl.mn_ry = 2.0;
   skl.swp = 1.0; // angle swept between vertices at tip
 
   skl.angl = angl;
