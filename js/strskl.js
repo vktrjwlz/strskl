@@ -14,6 +14,7 @@ strskl.errng = function () {
 
   errng.mxattmpts = 1000; // num times to attempt to generate vertices
   errng.mx_slc = 0.5;
+  errng.mx_iskt = Math.PI / 2.0; // max intersect angle between tip rays
 
   errng.strt = 0.6; // width of struts
 
@@ -51,13 +52,7 @@ strskl.errng.prototype = {
       var angl = Math.random() * Math.PI * 2.0;
       var skl = new strskl.skl(angl, rad);
 
-      // try to add skl if its min distance from others
-      var mndst = true;
-      for (var i = 0; i < errng.skls.length; i++) {
-        var dst = vec2.dist(skl.tp, errng.skls[i].tp);
-        if (dst < errng.mndst) mndst = false;
-      }
-      if (mndst) errng._add_skl(skl);
+      errng._add_skl(skl);
     }
     console.log("generated " + errng.skls.length + " skls in " + attmpts + " attempts");
 
@@ -92,8 +87,13 @@ strskl.errng.prototype = {
   _add_skl: function (skl) {
     var errng = this;
 
+    // if skl is under min distance from others fail
     // if skl is covered fail
     for (var i = 0; i < errng.skls.length; i++) {
+      var dst = vec2.dist(skl.tp, errng.skls[i].tp);
+      if (dst < errng.mndst) {
+        return false;
+      }
       if (errng.skls[i].covers(skl)) {
         console.log("$$$ " + errng.skls[i].toString() + " covers " + skl.toString() + " :/");
         return false;
@@ -101,23 +101,20 @@ strskl.errng.prototype = {
     }
 
     // find skl to intersect with
-    var mnlftdst = skl.rad;
+    var mnlftdst = skl.rad * 2.0;
     var mnlftvrt = null;
     var mnlftdx = -1;
-    var mnrtdst = skl.rad;
+    var mnrtdst = skl.rad * 2.0;
     var mnrtvrt = null;
     var mnrtdx = -1;
     for (var i = 0; i < errng.skls.length; i++) {
       var oskl = errng.skls[i];
       var ivrt = vec2.create();
-      var ts = [];
-      var iskt = oskl.intersects(skl, ivrt, ts);
+      var iskt = oskl.intersects(skl, ivrt);
 
       // if intersection test was successful check if it is closest
       if (iskt !== 0) {
-        var dlta = vec2.create();
-        vec2.sub(dlta, ivrt, skl.tp);
-        var dst = vec2.length(dlta);
+        var dst = vec2.dist(ivrt, skl.tp);
         if (iskt > 0) { // left
           if (dst < mnlftdst) {
             mnlftdst = dst;
@@ -153,7 +150,7 @@ strskl.errng.prototype = {
       skl.rt_rnt = mnrtdx;
     }
 
-    // find length of new rays
+    // if length of new ray is less than min dont add
     var lftlngth = vec2.dist(skl.tp, skl.lft_vrt);
     var rtlngth = vec2.dist(skl.tp, skl.rt_vrt);
     if (lftlngth < errng.mn_ry || rtlngth < errng.mn_ry) {
@@ -161,8 +158,35 @@ strskl.errng.prototype = {
       return false;
     }
 
+    // if angle of intersection is greater than max dont add
+    var lftangl = errng._skl_rnt_angle(skl, true);
+    var rtangl = errng._skl_rnt_angle(skl, false);
+    if ((lftangl + skl.swp > errng.mx_iskt) || (rtangl + skl.swp > errng.mx_iskt)) {
+      console.log("cant intersect: angle between scales too large");
+      return 0;
+    }
+
     errng.skls.push(skl);
     return true;
+  },
+
+  _skl_rnt_angle: function (skl, lft) {
+    var errng = this;
+
+    // pick rnt & vrt
+    var vrt = skl.lft_vrt;
+    var rnt = skl.lft_rnt;
+    if (!lft) {
+      vrt = skl.rt_vrt;
+      rnt = skl.rt_rnt;
+    }
+
+    // if rnt & vrt arent set fail
+    if (vrt === null || rnt === null) return -1;
+
+    // get parent skl
+    var rntskl = errng.skls[rnt];
+    return skl.angle_to_skl(rntskl);
   },
 
   // intersect skl ray with center min radius
@@ -254,7 +278,6 @@ strskl.errng.prototype = {
 strskl.skl = function (angl, rad) {
   var skl = this;
 
-  skl.mx_iskt = Math.PI / 2.0; // max intersect angle between tip rays
   skl.mn_ry = 2.0;
   skl.swp = 1.0; // angle swept between vertices at tip
 
@@ -286,6 +309,14 @@ strskl.skl.prototype = {
       + " rnts: " + [skl.lft_rnt, skl.rt_rnt].join(" - ") + ")";
   },
 
+  // calculate angle from center to tip between skls
+  angle_to_skl: function (oskl) {
+    var skl = this;
+
+    var sg = lzr.sg.from_end(vec2.fromValues(0, 0), skl.tp);
+    return lzr.sg.angle_to(sg, oskl.tp);
+  },
+
   // return true if this scale would cover tip of other scale
   covers: function (oskl) {
     var skl = this;
@@ -308,7 +339,7 @@ strskl.skl.prototype = {
 
   // return side intersected & intersection point
   // assumes oskl isnt covered by this skl
-  intersects: function (oskl, ivrt, ts) { // 1 -> left, 0 -> not, -1 -> right
+  intersects: function (oskl, ivrt) { // 1 -> left, 0 -> not, -1 -> right
     var skl = this;
 
     console.log("testing if " + oskl + " intersects " + skl);
@@ -326,12 +357,6 @@ strskl.skl.prototype = {
 
     // if angle between skls is less than epsilon return 0
     if (angl < lzr.EPSILON) return 0;
-
-    // if angle of intersection is greater than max skls dont intersect
-    if (angl + ((skl.swp + oskl.swp) * 0.5) > skl.mx_iskt) {
-      console.log("cant intersect: angle between scales too large");
-      return 0;
-    }
 
     // get sgs to intersect from other skl and this skl
     var otsg = lzr.sg.from_end(oskl.tp, vec2.fromValues(0, 0));
@@ -358,7 +383,7 @@ strskl.skl.prototype = {
     var rylngth = lzr.sg.mag(tsg);
     var t = tplngth / rylngth;
 
-    ts.push(t); // push t value of intersection point
+    // ts.push(t); // push t value of intersection point
 
     console.log("tplngth: " + tplngth.toFixed(2)
       + " ndlngth: " + ndlngth.toFixed(2)
