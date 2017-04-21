@@ -18,7 +18,7 @@ strskl.errng = function () {
 
   errng.strt = 0.6; // width of struts
 
-  errng.mndst = 2.0; // min distance between vertices
+  errng.mndst = 1.5; // min distance between vertices
   errng.mn_tp = 1.0;
 
   errng.mn_ry = 2.0;
@@ -37,13 +37,7 @@ strskl.errng.prototype = {
 
     console.log("generating earring");
 
-    var rtmt = mat2.create();
-    var orgn = vec2.create();
-    vec2.add(orgn, errng.mn, errng.orgn); // get center of hoop
-
-    console.log("origin " + orgn);
-
-    // generate points inside hoop
+    // generate skls with random rad & angl & attempt to add
     errng.skls = [];
     attmpts = 0;
     while (attmpts < errng.mxattmpts) {
@@ -57,30 +51,108 @@ strskl.errng.prototype = {
     }
     console.log("generated " + errng.skls.length + " skls in " + attmpts + " attempts");
 
-    // adjust center skls
-    var skls = errng.skls.slice();
-    skls.sort(strskl.skl.cmp_rad);
+    // clean up center skls
+    errng._snip_cntr();
 
-    for (var i = 0; i < skls.length; i++) {
-      var skl = skls[i];
+    // generate lines from skls for debugging
+    errng._viz_skls();
+  },
 
-      if (skl.lft_rnt !== null) {
-        var lftrnt = errng.skls[skl.lft_rnt];
-        if (lftrnt.rt_rnt === null) {
-          vec2.copy(lftrnt.rt_vrt, skl.lft_vrt);
-          lftrnt.rt_rnt = errng.skls.indexOf(skl);
+  // clean up center skls
+  _snip_cntr: function () {
+    var errng = this;
+
+    console.log("snipping center");
+
+    // make list of skls with null lft or rt parents
+    var nlskls = [];
+    for (var i = 0; i < errng.skls.length; i++) {
+      var skl = errng.skls[i];
+      if (skl.lft_rnt < 0 || skl.rt_rnt < 0) nlskls.push(skl);
+    }
+
+    // process skls from null list
+    while (nlskls.length > 0) {
+      var nlskl = nlskls.pop();
+      var nldx = errng.skls.indexOf(nlskl);
+      if (nldx >= 0) {
+
+        // find skls with this skl as parent
+        var lftkds = [], rtkds = [];
+        for (var i = 0; i < errng.skls.length; i++) {
+          var skl = errng.skls[i];
+          if (skl.lft_rnt === nldx) rtkds.push(skl);
+          if (skl.rt_rnt === nldx) lftkds.push(skl);
         }
-      }
-      if (skl.rt_rnt !== null) {
-        var rtrnt = errng.skls[skl.rt_rnt];
-        if (rtrnt.lft_rnt === null) {
-          vec2.copy(rtrnt.lft_vrt, skl.rt_vrt);
-          rtrnt.lft_rnt = errng.skls.indexOf(skl);
+
+        // if this skl has root ray with no kids delete it
+        if ((nlskl.lft_rnt < 0 && lftkds.length === 0)
+            || (nlskl.rt_rnt < 0 && rtkds.length === 0)) {
+
+          // remove from errng skls list
+          errng.skls.splice(nldx, 1);
+
+          // add kd skls to nlskl list
+          for (var i = 0; i < lftkds.length; i++) {
+            var skl = lftkds[i];
+            skl.rt_rnt = -1;
+            if (nlskls.indexOf(skl) < 0) nlskls.push(skl);
+          }
+          for (var i = 0; i < rtkds.length; i++) {
+            var skl = rtkds[i];
+            skl.lft_rnt = -1;
+            if (nlskls.indexOf(skl) < 0) nlskls.push(skl);
+          }
+
+          // if parent index is greater than deleted index reduce it by 1
+          for (var i = 0; i < errng.skls.length; i++) {
+            var skl = errng.skls[i];
+            if (skl.lft_rnt > nldx) skl.lft_rnt--;
+            if (skl.rt_rnt > nldx) skl.rt_rnt--;
+          }
+
+        // otherwise snip to furthest kid
+        } else {
+          if (nlskl.lft_rnt < 0) {
+            var mxkd = lftkds[0];
+            var mxdst = vec2.dist(nlskl.tp, mxkd.rt_vrt);
+            for (var i = 1; i < lftkds.length; i++) {
+              var dst = vec2.dist(nlskl.tp, lftkds[i].rt_vrt);
+              if (dst > mxdst) {
+                mxdst = dst;
+                mxkd = lftkds[i];
+              }
+            }
+            vec2.copy(nlskl.lft_vrt, mxkd.rt_vrt);
+            nlskl.lft_rnt = errng.skls.indexOf(mxkd);
+          }
+          if (nlskl.rt_rnt < 0) {
+            var mxkd = rtkds[0];
+            var mxdst = vec2.dist(nlskl.tp, mxkd.lft_vrt);
+            for (var i = 1; i < rtkds.length; i++) {
+              var dst = vec2.dist(nlskl.tp, rtkds[i].lft_vrt);
+              if (dst > mxdst) {
+                mxdst = dst;
+                mxkd = rtkds[i];
+              }
+            }
+            vec2.copy(nlskl.rt_vrt, mxkd.lft_vrt);
+            nlskl.rt_rnt = errng.skls.indexOf(mxkd);
+          }
         }
       }
     }
+  },
 
-    // generate lines from skls for debugging
+  // generate lines from skls for debugging
+  _viz_skls: function () {
+    var errng = this;
+
+    var orgn = vec2.create();
+    vec2.add(orgn, errng.mn, errng.orgn); // get center of hoop
+
+    console.log("origin " + orgn);
+
     errng.lns = [];
 
     for (var i = 0; i < errng.skls.length; i++) {
@@ -239,7 +311,7 @@ strskl.errng.prototype = {
     }
 
     // if rnt & vrt arent set fail
-    if (vrt === null || rnt === null) return -1;
+    if (vrt === null || rnt < 0) return -1;
 
     // get parent skl
     var rntskl = errng.skls[rnt];
@@ -349,8 +421,8 @@ strskl.skl = function (angl, rad) {
 
   skl.lft_vrt = null;
   skl.rt_vrt = null;
-  skl.lft_rnt = null;
-  skl.rt_rnt = null;
+  skl.lft_rnt = -1;
+  skl.rt_rnt = -1;
 }
 
 strskl.skl.prototype = {

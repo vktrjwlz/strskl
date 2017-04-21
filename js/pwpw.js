@@ -23,18 +23,18 @@ function pwpw() {
   for (var i = 0; i < errng.lns.length; i++)
     rndrr.mshs.push(errng.lns[i]);
 
-  for (var i = 0; i < errng.skls.length; i++) {
-    var vrt = vec2.clone(errng.skls[i].tp);
-    vec2.add(vrt, vrt, errng.mn);
-    vec2.add(vrt, vrt, errng.orgn);
-    var r = new lzr.rng();
-    r.rgba = [0.0, 1.0, 0.0, 0.5]; // greenish
-    r.center = vrt;
-    r.radius = 1.0;
-    r.weight = 0.2;
-    r.segments = 16;
-    rndrr.mshs.push(r);
-  }
+  // for (var i = 0; i < errng.skls.length; i++) {
+  //   var vrt = vec2.clone(errng.skls[i].tp);
+  //   vec2.add(vrt, vrt, errng.mn);
+  //   vec2.add(vrt, vrt, errng.orgn);
+  //   var r = new lzr.rng();
+  //   r.rgba = [0.0, 1.0, 0.0, 0.5]; // greenish
+  //   r.center = vrt;
+  //   r.radius = 1.0;
+  //   r.weight = 0.2;
+  //   r.segments = 16;
+  //   rndrr.mshs.push(r);
+  // }
 
   var c = new lzr.rng();
   var vrt = vec2.clone(errng.orgn);
