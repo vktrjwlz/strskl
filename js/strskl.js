@@ -12,13 +12,14 @@ strskl.errng = function () {
 
   // errng.wide_thrsh = Math.PI / 1.5;
 
-  errng.mxattmpts = 1000; // num times to attempt to generate vertices
+  errng.mxattmpts = 100000; // num times to attempt to generate vertices
   errng.mx_slc = 0.5;
-  errng.mx_iskt = Math.PI / 2.0; // max intersect angle between tip rays
+  errng.mx_iskt = Math.PI / 1.8; // max intersect angle between tip rays
 
   errng.strt = 0.6; // width of struts
 
   errng.mndst = 2.0; // min distance between vertices
+  errng.mn_tp = 1.0;
 
   errng.mn_ry = 2.0;
 
@@ -55,6 +56,29 @@ strskl.errng.prototype = {
       errng._add_skl(skl);
     }
     console.log("generated " + errng.skls.length + " skls in " + attmpts + " attempts");
+
+    // adjust center skls
+    var skls = errng.skls.slice();
+    skls.sort(strskl.skl.cmp_rad);
+
+    for (var i = 0; i < skls.length; i++) {
+      var skl = skls[i];
+
+      if (skl.lft_rnt !== null) {
+        var lftrnt = errng.skls[skl.lft_rnt];
+        if (lftrnt.rt_rnt === null) {
+          vec2.copy(lftrnt.rt_vrt, skl.lft_vrt);
+          lftrnt.rt_rnt = errng.skls.indexOf(skl);
+        }
+      }
+      if (skl.rt_rnt !== null) {
+        var rtrnt = errng.skls[skl.rt_rnt];
+        if (rtrnt.lft_rnt === null) {
+          vec2.copy(rtrnt.lft_vrt, skl.rt_vrt);
+          rtrnt.lft_rnt = errng.skls.indexOf(skl);
+        }
+      }
+    }
 
     // generate lines from skls for debugging
     errng.lns = [];
@@ -95,7 +119,7 @@ strskl.errng.prototype = {
         return false;
       }
       if (errng.skls[i].covers(skl)) {
-        console.log("$$$ " + errng.skls[i].toString() + " covers " + skl.toString() + " :/");
+        // console.log("$$$ " + errng.skls[i].toString() + " covers " + skl.toString() + " :/");
         return false;
       }
     }
@@ -154,7 +178,7 @@ strskl.errng.prototype = {
     var lftlngth = vec2.dist(skl.tp, skl.lft_vrt);
     var rtlngth = vec2.dist(skl.tp, skl.rt_vrt);
     if (lftlngth < errng.mn_ry || rtlngth < errng.mn_ry) {
-      console.log("cant add new skl: ray too short");
+      // console.log("cant add new skl: ray too short");
       return false;
     }
 
@@ -162,8 +186,41 @@ strskl.errng.prototype = {
     var lftangl = errng._skl_rnt_angle(skl, true);
     var rtangl = errng._skl_rnt_angle(skl, false);
     if ((lftangl + skl.swp > errng.mx_iskt) || (rtangl + skl.swp > errng.mx_iskt)) {
-      console.log("cant intersect: angle between scales too large");
-      return 0;
+      // console.log("cant intersect: angle between scales too large");
+      return false;
+    }
+
+    // if ray is too close to another skl tip dont add
+    for (var i = 0; i < errng.skls.length; i++) {
+      var oskl = errng.skls[i];
+
+      var angl = skl.angle_to_skl(oskl);
+      if (angl < skl.swp) {
+        var otp = oskl.tp;
+        var lftry = lzr.sg.from_end(skl.tp, skl.lft_vrt);
+        var rtry = lzr.sg.from_end(skl.tp, skl.rt_vrt);
+
+        var lftpvrt = vec2.create();
+        var rtpvrt = vec2.create();
+        lzr.sg.project(lftpvrt, lftry, otp);
+        lzr.sg.project(rtpvrt, rtry, otp);
+        lps = [
+          vec2.dist(lftpvrt, skl.tp),
+          vec2.dist(lftpvrt, skl.lft_vrt),
+          vec2.dist(skl.tp, skl.lft_vrt)
+        ];
+        rps = [
+          vec2.dist(rtpvrt, skl.tp),
+          vec2.dist(rtpvrt, skl.rt_vrt),
+          vec2.dist(skl.tp, skl.rt_vrt)
+        ];
+
+        var lftdst = lzr.sg.mn_dst(lftry, otp);
+        var rtdst = lzr.sg.mn_dst(rtry, otp);
+        if (lftdst < errng.mn_tp || rtdst < errng.mn_tp) {
+          return false;
+        }
+      }
     }
 
     errng.skls.push(skl);
@@ -342,7 +399,7 @@ strskl.skl.prototype = {
   intersects: function (oskl, ivrt) { // 1 -> left, 0 -> not, -1 -> right
     var skl = this;
 
-    console.log("testing if " + oskl + " intersects " + skl);
+    // console.log("testing if " + oskl + " intersects " + skl);
 
     if (skl.lft_vrt === null || skl.rt_vrt === null) {
       console.log("ERROR: attempted to intersect with unset skl");
@@ -353,7 +410,7 @@ strskl.skl.prototype = {
     var lft = lzr.sg.is_left(osg, oskl.tp);
     var angl = lzr.sg.angle_to(osg, oskl.tp);
 
-    console.log("angle betweeen scales: " + angl.toFixed(2) + " left: " + lft);
+    // console.log("angle betweeen scales: " + angl.toFixed(2) + " left: " + lft);
 
     // if angle between skls is less than epsilon return 0
     if (angl < lzr.EPSILON) return 0;
@@ -370,12 +427,12 @@ strskl.skl.prototype = {
     }
     var tsg = lzr.sg.from_end(skl.tp, nd);
 
-    console.log("*intersecting " + lzr.sg.str(tsg) + " and " + lzr.sg.str(otsg));
+    // console.log("*intersecting " + lzr.sg.str(tsg) + " and " + lzr.sg.str(otsg));
 
     // find point where other sg intersects with this sg
     lzr.sg.intersect(ivrt, otsg, tsg);
 
-    console.log("***intersection point: " + lzr.v2.str(ivrt));
+    // console.log("***intersection point: " + lzr.v2.str(ivrt));
 
     // find t of intersection point
     var tplngth = vec2.dist(ivrt, skl.tp);
@@ -385,13 +442,13 @@ strskl.skl.prototype = {
 
     // ts.push(t); // push t value of intersection point
 
-    console.log("tplngth: " + tplngth.toFixed(2)
-      + " ndlngth: " + ndlngth.toFixed(2)
-      + " rylngth: " + rylngth.toFixed(2));
-    console.log("******intersects at t: " + t.toFixed(2));
+    // console.log("tplngth: " + tplngth.toFixed(2)
+    //   + " ndlngth: " + ndlngth.toFixed(2)
+    //   + " rylngth: " + rylngth.toFixed(2));
+    // console.log("******intersects at t: " + t.toFixed(2));
 
     if (tplngth > rylngth || ndlngth > rylngth) {
-      console.log("******intersection is outside of segment");
+      // console.log("******intersection is outside of segment");
       return 0;
     }
 
@@ -400,3 +457,9 @@ strskl.skl.prototype = {
     return -1;
   }
 }
+strskl.skl.cmp_rad = function (a, b) {
+  return a.rad - b.rad;
+};
+strskl.skl.cmp_angl = function (a, b) {
+  return a.angl - b.angl;
+};

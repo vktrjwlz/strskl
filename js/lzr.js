@@ -533,15 +533,39 @@ lzr.sg.project = function (ouv, p, sg) { // vec2 ouv, p / lzr.sg sg
   // add vector b to origin to get new point projected onto sgment
   vec2.add(ouv, orgn, b);
   return ouv;
-}
+};
+
+// find min distance from segment to point
+lzr.sg.mn_dst = function (sg, p) {
+
+  // project point onto segment at a
+  var a = vec2.create();
+  lzr.sg.project(a, p, sg);
+
+  // if a is between start and end of segment return normal dist
+  var orgn = vec2.create(), end = vec2.create();
+  lzr.sg.orgn(orgn, sg);
+  lzr.sg.end(end, sg);
+  var sgdst = lzr.sg.mag(sg);
+  var orgndst = vec2.dist(orgn, a);
+  var enddst = vec2.dist(end, a);
+  if (orgndst < sgdst && enddst < sgdst) {
+    return vec2.dist(a, p);
+  }
+
+  // otherwise return min distance to point
+  var orgnpdst = vec2.dist(orgn, p);
+  var endpdst = vec2.dist(end, p);
+  if (orgnpdst < endpdst) return orgnpdst;
+  return endpdst;
+};
 
 // return distance from sg sg to vec2 p, orthogonal to sg
 lzr.sg.distance = function (sg, p) { // vec2 p
   var a = vec2.create();
-  lzr.sg.project( a, p, sg );
-  vec2.sub( a, a, p );
-  return vec2.length( a );
-}
+  lzr.sg.project(a, p, sg);
+  return vec2.dist(a, p);
+};
 
 // reflect delta vec2 p across delta of sg sg and assign to vec2 ouv
 lzr.sg.reflect_dlta = function (ouv, p, sg) {
