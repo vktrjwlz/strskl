@@ -56,6 +56,228 @@ strskl.errng.prototype = {
 
     // generate lines from skls for debugging
     errng._viz_skls();
+
+    // build pn from skls
+    errng._gen_pn();
+  },
+
+  // build pn from skls
+  _gen_pn: function () {
+    var errng = this;
+
+    var orgn = vec2.create();
+    vec2.add(orgn, errng.mn, errng.orgn); // get center of hoop
+
+    console.log("origin " + orgn);
+
+    errng.pn = new lzr.pn();
+
+    // skls to be processed
+    var skls = errng.skls.slice();
+
+    // remove center skls
+    skls.sort(strskl.skl.cmp_rad); // sort skls by radius
+    var fskl = skls.shift(); // remove min rad skale
+    var nxtskl = errng.skls[fskl.rt_rnt];
+    var x = 0;
+    while (x < errng.skls.length && nxtskl !== fskl) {
+      x++;
+
+      // remove nxtskl from skls
+      var dx = skls.indexOf(nxtskl);
+      if (dx >= 0) skls.splice(dx, 1);
+
+      // set nxtskl to right parent
+      nxtskl = errng.skls[nxtskl.rt_rnt];
+    }
+
+    // generate boundary
+    var bndry = errng.pn.bndry;
+    fskl = skls[skls.length - 1]; // start with largest radius skl
+    errng.fskl = fskl;
+    var v = vec2.create();
+    vec2.add(v, orgn, fskl.tp);
+    bndry.vrts.push(vec2.clone(v)); // add first tip to boundary
+    var lstskl = fskl;
+    var nxtdx = errng._nxt_skl(lstskl, false);
+    if (nxtdx < 0) {
+      console.log("ERROR: failed to find next skl for boundary");
+      return false;
+    }
+    nxtskl = errng.skls[nxtdx];
+    x = 0;
+    while (x < errng.skls.length && nxtskl !== fskl) {
+      x++;
+
+      // add intermediate point
+      if (lstskl.rt_rnt === nxtdx) {
+        vec2.add(v, orgn, lstskl.rt_vrt);
+        bndry.vrts.push(vec2.clone(v));
+      } else {
+        vec2.add(v, orgn, nxtskl.lft_vrt);
+        bndry.vrts.push(vec2.clone(v));
+      }
+
+      // add tip
+      vec2.add(v, orgn, nxtskl.tp);
+      bndry.vrts.push(vec2.clone(v));
+
+      // find next skl
+      lstskl = nxtskl;
+      nxtdx = errng._nxt_skl(lstskl, false);
+      if (nxtdx < 0) {
+        console.log("ERROR: failed to find next skl for boundary");
+        return false;
+      }
+      nxtskl = errng.skls[nxtdx];
+    }
+
+    // add last intermediate point
+    if (lstskl.rt_rnt === nxtdx) {
+      vec2.add(v, orgn, lstskl.rt_vrt);
+      bndry.vrts.push(vec2.clone(v));
+    } else {
+      vec2.add(v, orgn, nxtskl.lft_vrt);
+      bndry.vrts.push(vec2.clone(v));
+    }
+
+    // offset boundary loop
+    bndry.offset(errng.strt * 0.5);
+
+    // generate voids
+    skls = [skls[0]];
+    while (skls.length > 0) {
+      var skl = skls.pop();
+      errng.fskl = skl;
+      var endskl = errng.skls[skl.lft_rnt];
+      var vd = new lzr.lp();
+
+      // add first vrts from skl
+      vec2.add(v, orgn, skl.lft_vrt);
+      vd.vrts.push(vec2.clone(v));
+      vec2.add(v, orgn, skl.tp);
+      vd.vrts.push(vec2.clone(v));
+      vec2.add(v, orgn, skl.rt_vrt);
+      vd.vrts.push(vec2.clone(v));
+
+      // add left vrt of either first parent skl, or closest kid skl
+      lstskl = errng.skls[skl.rt_rnt];
+      var mndx = errng._nxt_skl(lstskl, true);
+      if (mndx < 0) {
+        console.log("ERROR: failed to find next skl for void");
+        return false;
+      }
+
+      // if mndx is lstskls left parent, add lstskls left vertex
+      // & set left parent as next
+      if (mndx === lstskl.lft_rnt) {
+        vec2.add(v, orgn, lstskl.lft_vrt);
+        vd.vrts.push(vec2.clone(v));
+        nxtskl = errng.skls[lstskl.lft_rnt];
+
+      // otherwise add lstskls closest kids right vertex & set that kid as next
+      } else {
+        nxtskl = errng.skls[mndx];
+        vec2.add(v, orgn, nxtskl.rt_vrt);
+        vd.vrts.push(vec2.clone(v));
+      }
+
+      // loop over left parents until end skl is reached
+      x = 0;
+      while (x < errng.skls.length && nxtskl !== endskl) {
+        x++;
+
+        // add nxtskls tip
+        vec2.add(v, orgn, nxtskl.tp);
+        vd.vrts.push(vec2.clone(v));
+
+        // check for kids
+        mndx = errng._nxt_skl(nxtskl, true);
+        if (mndx < 0) {
+          console.log("ERROR: failed to find next skl for void");
+          return false;
+        }
+        if (mndx === nxtskl.lft_rnt) {
+          vec2.add(v, orgn, nxtskl.lft_vrt);
+          vd.vrts.push(vec2.clone(v));
+          nxtskl = errng.skls[nxtskl.lft_rnt];
+        } else {
+          nxtskl = errng.skls[mndx];
+          vec2.add(v, orgn, nxtskl.rt_vrt);
+          vd.vrts.push(vec2.clone(v));
+        }
+      }
+
+      // offset boundary void and add to pn voids
+      //vd.offset(errng.strt * -0.5);
+      errng.pn.vds.push(vd);
+    }
+    return true;
+  },
+
+  // TODO find next closest rt & lft vrts for skl
+  _nxt_skl: function (skl, lft) {
+    var errng = this;
+
+    var dx = errng.skls.indexOf(skl);
+    if (dx < 0) return -1;
+
+    // find skls that are kids of given skl
+    var kddxs = [];
+    for (var i = 0; i < errng.skls.length; i++) {
+      if (lft && errng.skls[i].rt_rnt === dx) {
+        kddxs.push(i);
+      }
+      if (!lft && errng.skls[i].lft_rnt === dx) {
+        kddxs.push(i);
+      }
+    }
+
+    // if skl has no kids on given side return parent
+    if (kddxs.length < 1) {
+      if (lft) return skl.lft_rnt;
+      else return skl.rt_rnt;
+    }
+
+    // otherwise find kid skl with vrt closest to given skl tip
+    var mndx = kddxs[0];
+    var mnskl = errng.skls[mndx];
+    var mndst;
+    if (lft) mndst = vec2.dist(skl.tp, mnskl.rt_vrt);
+    else mndst = vec2.dist(skl.tp, mnskl.lft_vrt);
+    for (var i = 1; i < kddxs.length; i++) {
+      var kddx = kddxs[i];
+      var kdskl = errng.skls[kddx];
+      var dst;
+      if (lft) dst = vec2.dist(skl.tp, kdskl.rt_vrt);
+      else dst = vec2.dist(skl.tp, kdskl.lft_vrt);
+      if (dst < mndst) {
+        mndst = dst;
+        mndx = kddx;
+        mnskl = kdskl;
+      }
+    }
+    return mndx;
+  },
+
+  _skl_kds: function (skl, lft) {
+    var errng = this;
+    var kds = [];
+
+    var dx = errng.skls.indexOf(skl);
+    if (dx < 0) {
+      console.log("ERROR: cant get kids - skl not in errng");
+      return kds;
+    }
+
+    for (var i = 0; i < errng.skls.length; i++) {
+      var kdskl = errng.skls[i];
+
+      if (lft && kdskl.rt_rnt === dx) kds.push(kdskl);
+      if (!lft && kdskl.lft_rnt === dx) kds.push(kdskl);
+    }
+
+    return kds;
   },
 
   // clean up center skls

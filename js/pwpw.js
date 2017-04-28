@@ -20,6 +20,9 @@ function pwpw() {
 
   errng.generate();
 
+  // add earring pn to renderer
+  rndrr.mshs.push(errng.pn);
+
   for (var i = 0; i < errng.lns.length; i++)
     rndrr.mshs.push(errng.lns[i]);
 
@@ -43,6 +46,17 @@ function pwpw() {
   c.center = vrt;
   c.radius = errng.cntr_rad;
   c.weight = 0.4;
+  c.segments = 32;
+  rndrr.mshs.push(c);
+
+  c = new lzr.rng();
+  vrt = vec2.clone(errng.fskl.tp);
+  vec2.add(vrt, vrt, errng.orgn);
+  vec2.add(vrt, vrt, errng.mn);
+  c.rgba = [0.0, 0.0, 1.0, 0.5]; // blueish
+  c.center = vrt;
+  c.radius = 1.0;
+  c.weight = 0.2;
   c.segments = 32;
   rndrr.mshs.push(c);
 
