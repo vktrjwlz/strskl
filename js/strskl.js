@@ -145,7 +145,7 @@ strskl.errng.prototype = {
     bndry.offset(errng.strt * 0.5);
 
     // generate voids
-    skls = [skls[0]];
+    // skls = [skls[0]]; // TODO remove this test setup
     while (skls.length > 0) {
       var skl = skls.pop();
       errng.fskl = skl;
@@ -160,31 +160,23 @@ strskl.errng.prototype = {
       vec2.add(v, orgn, skl.rt_vrt);
       vd.vrts.push(vec2.clone(v));
 
-      // add left vrt of either first parent skl, or closest kid skl
-      lstskl = errng.skls[skl.rt_rnt];
-      var mndx = errng._nxt_skl(lstskl, true);
-      if (mndx < 0) {
-        console.log("ERROR: failed to find next skl for void");
-        return false;
-      }
-
-      // if mndx is lstskls left parent, add lstskls left vertex
-      // & set left parent as next
-      if (mndx === lstskl.lft_rnt) {
-        vec2.add(v, orgn, lstskl.lft_vrt);
+      // find next sibling on right side
+      var rntskl = errng.skls[skl.rt_rnt];
+      var sibskl = errng._nxt_sib_skl(skl, false);
+      if (sibskl === rntskl) {
+        vec2.add(v, orgn, rntskl.lft_vrt);
         vd.vrts.push(vec2.clone(v));
-        nxtskl = errng.skls[lstskl.lft_rnt];
-
-      // otherwise add lstskls closest kids right vertex & set that kid as next
+        nxtskl = errng.skls[rntskl.lft_rnt];
       } else {
-        nxtskl = errng.skls[mndx];
-        vec2.add(v, orgn, nxtskl.rt_vrt);
+        vec2.add(v, orgn, sibskl.rt_vrt);
         vd.vrts.push(vec2.clone(v));
+        nxtskl = sibskl;
       }
 
       // loop over left parents until end skl is reached
       x = 0;
-      while (x < errng.skls.length && nxtskl !== endskl) {
+      // while (x < errng.skls.length && nxtskl !== endskl) {
+      while (x < 0 && nxtskl !== endskl) {
         x++;
 
         // add nxtskls tip
@@ -209,13 +201,53 @@ strskl.errng.prototype = {
       }
 
       // offset boundary void and add to pn voids
-      //vd.offset(errng.strt * -0.5);
+      vd.offset(errng.strt * -0.5);
       errng.pn.vds.push(vd);
     }
     return true;
   },
 
-  // TODO find next closest rt & lft vrts for skl
+  //
+  _nxt_sib_skl: function (skl, lft) {
+    var errng = this;
+
+    var rntdx;
+    if (lft) rntdx = skl.lft_rnt;
+    else rntdx = skl.rt_rnt;
+    var rntskl = errng.skls[rntdx];
+
+    var kds = errng._skl_kds(rntskl, !lft);
+
+    var skldst;
+    if (lft) skldst = vec2.dist(rntskl.tp, skl.lft_vrt);
+    else skldst = vec2.dist(rntskl.tp, skl.rt_vrt);
+
+    var mnskl = null;
+    var mndst;
+    if (lft) mndst = vec2.dist(rntskl.tp, rntskl.rt_vrt);
+    else mndst = vec2.dist(rntskl.tp, rntskl.lft_vrt);
+
+    // find closest sibling past this scale
+    for (var i = 0; i < kds.length; i++) {
+      var kd = kds[i];
+      if (kd !== skl) {
+        var dst;
+        if (lft) dst = vec2.dist(rntskl.tp, kd.lft_vrt);
+        else dst = vec2.dist(rntskl.tp, kd.rt_vrt);
+
+        if (dst < mndst && dst > skldst) {
+          mndst = dst;
+          mnskl = kd;
+        }
+      }
+
+    }
+
+    if (mnskl === null) return rntskl;
+    return mnskl;
+  },
+
+  // find next closest rt & lft vrts for skl
   _nxt_skl: function (skl, lft) {
     var errng = this;
 
