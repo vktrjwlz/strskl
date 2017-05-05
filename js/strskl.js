@@ -55,7 +55,7 @@ strskl.errng.prototype = {
     errng._snip_cntr();
 
     // generate lines from skls for debugging
-    errng._viz_skls();
+    // errng._viz_skls();
 
     // build pn from skls
     errng._gen_pn();
@@ -94,7 +94,6 @@ strskl.errng.prototype = {
     // generate boundary
     var bndry = errng.pn.bndry;
     fskl = skls[skls.length - 1]; // start with largest radius skl
-    errng.fskl = fskl;
     var v = vec2.create();
     vec2.add(v, orgn, fskl.tp);
     bndry.vrts.push(vec2.clone(v)); // add first tip to boundary
@@ -145,7 +144,6 @@ strskl.errng.prototype = {
     bndry.offset(errng.strt * 0.5);
 
     // generate voids
-    // skls = [skls[0]]; // TODO remove this test setup
     while (skls.length > 0) {
       var skl = skls.pop();
       errng.fskl = skl;
@@ -175,8 +173,7 @@ strskl.errng.prototype = {
 
       // loop over left parents until end skl is reached
       x = 0;
-      // while (x < errng.skls.length && nxtskl !== endskl) {
-      while (x < 0 && nxtskl !== endskl) {
+      while (x < errng.skls.length && nxtskl !== endskl) {
         x++;
 
         // add nxtskls tip
